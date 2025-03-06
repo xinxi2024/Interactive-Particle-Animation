@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Particle Animation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      overflow: hidden;
+      background-color: #0f0f1e;
+      font-family: sans-serif;
+      color: white;
+    }
+    
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 10;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .controls label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 300px;
+    }
+    
+    .controls input {
+      width: 150px;
+    }
+    
+    .title {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      font-size: 24px;
+      font-weight: bold;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    
+    .description {
+      position: absolute;
+      top: 60px;
+      left: 20px;
+      z-index: 10;
+      max-width: 400px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+    
+    .interaction-mode {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 10px;
+    }
+    
+    .mode-button {
+      background-color: #333;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 5px;
+      margin: 0 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .mode-button.active {
+      background-color: #4361ee;
+    }
+    
+    .click-effect {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(255, 255, 255, 0.3);
+      z-index: 5;
+      animation: pulse 1s forwards;
+    }
+    
+    @keyframes pulse {
+      0% {
+        width: 0px;
+        height: 0px;
+        opacity: 0.7;
+      }
+      100% {
+        width: 200px;
+        height: 200px;
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  
+  <div class="title">Cosmic Connections</div>
+  <div class="description">
+    Move your mouse to interact with the particles. Click to create pulse effects. Try different interaction modes!
+  </div>
+  
+  <div class="interaction-mode">
+    <div>Interaction Mode:</div>
+    <button class="mode-button active" data-mode="attract">Attract</button>
+    <button class="mode-button" data-mode="repel">Repel</button>
+    <button class="mode-button" data-mode="swirl">Swirl</button>
+  </div>
+  
+  <div class="controls">
+    <label>
+      Particle Count
+      <input type="range" id="particleCount" min="50" max="500" value="150">
+    </label>
+    <label>
+      Connection Distance
+      <input type="range" id="connectionDistance" min="50" max="250" value="120">
+    </label>
+    <label>
+      Particle Speed
+      <input type="range" id="particleSpeed" min="1" max="5" value="2" step="0.1">
+    </label>
+    <label>
+      Mouse Influence
+      <input type="range" id="mouseInfluence" min="0" max="200" value="100">
+    </label>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Get control elements
+    const particleCountInput = document.getElementById('particleCount');
+    const connectionDistanceInput = document.getElementById('connectionDistance');
+    const particleSpeedInput = document.getElementById('particleSpeed');
+    const mouseInfluenceInput = document.getElementById('mouseInfluence');
+    const modeButtons = document.querySelectorAll('.mode-button');
+    
+    let width, height;
+    let particles = [];
+    let mouse = {
+      x: undefined,
+      y: undefined,
+      radius: 100,
+      pressed: false,
+      mode: 'attract' // Default mode: attract, repel, swirl
+    };
+    
+    // Initialize canvas
+    function initCanvas() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    }
+    
+    // Create particles
+    function createParticles() {
+      particles = [];
+      const count = parseInt(particleCountInput.value);
+      
+      for (let i = 0; i < count; i++) {
+        const size = Math.random() * 5 + 1;
+        const x = Math.random() * (width - size * 2) + size;
+        const y = Math.random() * (height - size * 2) + size;
+        const directionX = (Math.random() * 2) - 1;
+        const directionY = (Math.random() * 2) - 1;
+        
+        const color = getRandomColor();
+        
+        particles.push({
+          x,
+          y,
+          size,
+          color,
+          directionX,
+          directionY,
+          originalSize: size,
+          originalDirectionX: directionX,
+          originalDirectionY: directionY
+        });
+      }
+    }
+    
+    function getRandomColor() {
+      const colors = [
+        '#4cc9f0',
+        '#4895ef',
+        '#4361ee',
+        '#3f37c9',
+        '#3a0ca3',
+        '#480ca8',
+        '#560bad',
+        '#7209b7',
+        '#b5179e',
+        '#f72585'
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+    
+    // Create click pulse effect
+    function createPulseEffect(x, y) {
+      const pulse = document.createElement('div');
+      pulse.classList.add('click-effect');
+      pulse.style.left = x + 'px';
+      pulse.style.top = y + 'px';
+      document.body.appendChild(pulse);
+      
+      // Create particles burst from click
+      const burstCount = 15;
+      for (let i = 0; i < burstCount; i++) {
+        const size = Math.random() * 4 + 1;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 3 + 2;
+        const directionX = Math.cos(angle) * speed;
+        const directionY = Math.sin(angle) * speed;
+        
+        particles.push({
+          x,
+          y,
+          size,
+          color: getRandomColor(),
+          directionX,
+          directionY,
+          originalSize: size,
+          originalDirectionX: directionX,
+          originalDirectionY: directionY,
+          isBurst: true,
+          life: 100  // Lifespan counter
+        });
+      }
+      
+      // Remove the pulse element after animation completes
+      setTimeout(() => {
+        pulse.remove();
+      }, 1000);
+    }
+    
+    // Update particles
+    function updateParticles() {
+      const speed = parseFloat(particleSpeedInput.value);
+      const mouseRadius = parseInt(mouseInfluenceInput.value);
+      
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        
+        // Handle burst particles differently
+        if (p.isBurst) {
+          p.life -= 1;
+          
+          // Remove burst particles when their life is over
+          if (p.life <= 0) {
+            particles.splice(i, 1);
+            i--;
+            continue;
+          }
+          
+          // Make burst particles fade and slow down
+          p.size = p.originalSize * (p.life / 100);
+          p.x += p.directionX * (p.life / 100);
+          p.y += p.directionY * (p.life / 100);
+          
+          continue;
+        }
+        
+        // Move regular particles
+        p.x += p.directionX * speed;
+        p.y += p.directionY * speed;
+        
+        // Bounce off edges
+        if (p.x > width - p.size || p.x < p.size) {
+          p.directionX = -p.directionX;
+        }
+        if (p.y > height - p.size || p.y < p.size) {
+          p.directionY = -p.directionY;
+        }
+        
+        // Reset direction to original every frame, before applying mouse influence
+        p.directionX = p.originalDirectionX * speed;
+        p.directionY = p.originalDirectionY * speed;
+        
+        // Mouse interaction
+        if (mouse.x !== undefined && mouse.y !== undefined) {
+          const dx = mouse.x - p.x;
+          const dy = mouse.y - p.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < mouseRadius) {
+            // Expand particles near mouse
+            p.size = p.originalSize * (1 + (mouseRadius - distance) / mouseRadius);
+            
+            // Different mouse interaction modes
+            if (distance > 5) {
+              const force = (mouseRadius - distance) / mouseRadius * 0.3;
+              
+              if (mouse.mode === 'attract') {
+                // Attract particles toward mouse
+                p.directionX += dx * force;
+                p.directionY += dy * force;
+              } else if (mouse.mode === 'repel') {
+                // Repel particles away from mouse
+                p.directionX -= dx * force;
+                p.directionY -= dy * force;
+              } else if (mouse.mode === 'swirl') {
+                // Create a swirling effect around mouse
+                p.directionX += dy * force * 0.5;
+                p.directionY -= dx * force * 0.5;
+              }
+            }
+          } else {
+            p.size = p.originalSize;
+          }
+        }
+      }
+    }
+    
+    // Draw particles and connections
+    function drawParticles() {
+      ctx.clearRect(0, 0, width, height);
+      
+      const connectionDistance = parseInt(connectionDistanceInput.value);
+      
+      // Draw connections first (so they appear behind particles)
+      for (let i = 0; i < particles.length; i++) {
+        const p1 = particles[i];
+        
+        // Skip burst particles for connections
+        if (p1.isBurst) continue;
+        
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          
+          // Skip burst particles for connections
+          if (p2.isBurst) continue;
+          
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < connectionDistance) {
+            // Calculate opacity based on distance
+            const opacity = 1 - (distance / connectionDistance);
+            
+            // Draw connection line
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.5})`;
+            ctx.lineWidth = opacity * 2;
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      }
+      
+      // Draw particles
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        
+        // Set opacity for burst particles based on life
+        const opacity = p.isBurst ? p.life / 100 : 1;
+        
+        // Particle glow effect
+        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
+        
+        if (p.isBurst) {
+          gradient.addColorStop(0, p.color);
+          gradient.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        } else {
+          gradient.addColorStop(0, p.color);
+          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        }
+        
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Particle core
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.isBurst ? `${p.color}${Math.floor(opacity * 255).toString(16).padStart(2, '0')}` : p.color;
+        ctx.fill();
+      }
+    }
+    
+    // Animation loop
+    function animate() {
+      updateParticles();
+      drawParticles();
+      requestAnimationFrame(animate);
+    }
+    
+    // Handle mouse movement
+    canvas.addEventListener('mousemove', function(e) {
+      mouse.x = e.x;
+      mouse.y = e.y;
+    });
+    
+    // Handle mouse leave
+    canvas.addEventListener('mouseleave', function() {
+      mouse.x = undefined;
+      mouse.y = undefined;
+    });
+    
+    // Handle mouse click
+    canvas.addEventListener('mousedown', function(e) {
+      mouse.pressed = true;
+      createPulseEffect(e.x, e.y);
+    });
+    
+    canvas.addEventListener('mouseup', function() {
+      mouse.pressed = false;
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', function() {
+      initCanvas();
+      createParticles();
+    });
+    
+    // Handle interaction mode changes
+    modeButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove active class from all buttons
+        modeButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Add active class to clicked button
+        this.classList.add('active');
+        
+        // Set mouse mode
+        mouse.mode = this.getAttribute('data-mode');
+      });
+    });
+    
+    // Handle controls
+    particleCountInput.addEventListener('change', createParticles);
+    
+    // Initialize everything
+    initCanvas();
+    createParticles();
+    animate();
+  </script>
+</body>
+</html>
